@@ -4,29 +4,55 @@ import matplotlib.pyplot as plt
 
 data_dir = "./input/"
 def load_data(data_dir):
-    train = pd.read_json(data_dir+"train.json")
+    train = pd.read_json(data_dir+"train_with_imfs.json")
     test = pd.read_json(data_dir+"test.json")
     # Fill 'na' angles with zero
     train.inc_angle = train.inc_angle.replace('na', 0)
     train.inc_angle = train.inc_angle.astype(float).fillna(0.0)
     test.inc_angle = test.inc_angle.replace('na', 0)
     test.inc_angle = test.inc_angle.astype(float).fillna(0.0)
+
     return train, test
 
 train, test = load_data(data_dir)
+
 
 # Put images in an array = [imgNr, pixels, pixels, band], where band is polarization
 def process_images(df):
     X_band1 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_1"]])
     X_band2 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_2"]])
+    X_band1_imfs1 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_1_imf_1"]])
+    X_band1_imfs2 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_1_imf_2"]])
+    # X_band1_imfs3 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_1_imf_3"]])
+    # X_band1_imfs4 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_1_imf_4"]])
+    X_band2_imfs1 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_2_imf_1"]])
+    X_band2_imfs2 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_2_imf_2"]])
+    # X_band2_imfs3 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_2_imf_3"]])
+    # X_band2_imfs4 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_2_imf_4"]])
     # Merge bands and add another band as the mean of Band 1 and Band 2 (useful for the ImageDataGenerator later)
-    imgs = np.concatenate([X_band1[:, :, :, np.newaxis]
-                            , X_band2[:, :, :, np.newaxis]
-                            ,((X_band1+X_band2)/2)[:, :, :, np.newaxis]], axis=-1)
+    imgs = np.concatenate(([X_band1[:, :, :, np.newaxis],
+                            X_band1_imfs1[:, :, :, np.newaxis],
+                            X_band1_imfs2[:, :, :, np.newaxis],
+                            X_band2[:, :, :, np.newaxis],
+                            X_band2_imfs1[:, :, :, np.newaxis],
+                            X_band2_imfs2[:, :, :, np.newaxis],
+                            ((X_band1+X_band2)/2)[:, :, :, np.newaxis]]) ,axis=-1)
+                            # X_band1_imfs1[:, :, :, np.newaxis]) ,axis=-1)
+                            # X_band1_imfs2[:, :, :, np.newaxis],
+                            # X_band1_imfs3[:, :, :, np.newaxis],
+                            # X_band1_imfs4[:, :, :, np.newaxis],
+                            # X_band2_imfs1[:, :, :, np.newaxis]),
+                            # X_band2_imfs2[:, :, :, np.newaxis],
+                            # X_band2_imfs3[:, :, :, np.newaxis],
+                            # X_band2_imfs4[:, :, :, np.newaxis], axis=-1)
     return imgs
 
+a = 2;
+
 X_train = process_images(train)
-X_test = process_images(test)
+# _________________ X_test = process_images(test)
+
+
 
 X_angle_train = np.array(train.inc_angle)
 X_angle_test = np.array(test.inc_angle)
@@ -80,7 +106,7 @@ from keras.layers import Input, Dense, Reshape, concatenate, Conv2D, Flatten, Ma
 from keras.layers import BatchNormalization, Dropout, GlobalMaxPooling2D
 
 def cnn_model():
-    pic_input = Input(shape=(75, 75, 3))
+    pic_input = Input(shape=(75, 75, 7))
     ang_input = Input(shape=(1,))
 
     cnn = BatchNormalization()(pic_input)
@@ -97,16 +123,16 @@ def cnn_model():
 
     cnn_model = Model(inputs=[pic_input,ang_input],outputs=cnn)
 
-    cnn_model.compile(optimizer='adam', loss = 'binary_crossentropy', metrics = ['accuracy'])
+    cnn_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
     return cnn_model
 batch_size=64
 # Define the image transformations here
-gen = ImageDataGenerator(horizontal_flip = True,
-                         vertical_flip = True,
-                         width_shift_range = 0.1,
-                         height_shift_range = 0.1,
-                         zoom_range = 0.1,
-                         rotation_range = 40)
+gen = ImageDataGenerator(horizontal_flip=True,
+                         vertical_flip=True,
+                         width_shift_range=0.1,
+                         height_shift_range=0.1,
+                         zoom_range=0.1,
+                         rotation_range=5)
 
 # Here is the function that merges our two generators
 # We use the exact same generator with the same random seed for both the y and angle arrays
@@ -124,18 +150,17 @@ def gen_flow_for_two_inputs(X1, X2, y):
 gen_flow = gen_flow_for_two_inputs(X_train, X_angle_train, y_train)
 
 model = cnn_model()
-# Predict on test data
-test_predictions = model.predict([X_test,X_angle_test])
 
 model.fit_generator(gen_flow, validation_data=([X_valid, X_angle_valid], y_valid),
-                    steps_per_epoch=len(X_train) / batch_size, epochs=100)
-
+                    steps_per_epoch=len(X_train) / batch_size, epochs=400)
+# serialize weights to HDF5
+model.save_weights("model.h5")
 
 # Predict on test data
-test_predictions = model.predict([X_test,X_angle_test])
-
-# Create .csv
-pred_df = test[['id']].copy()
-pred_df['is_iceberg'] = test_predictions
-pred_df.to_csv('predictions.csv', index = False)
-pred_df.sample(3)
+# test_predictions = model.predict([X_test,X_angle_test])
+#
+# # Create .csv
+# pred_df = test[['id']].copy()
+# pred_df['is_iceberg'] = test_predictions
+# pred_df.to_csv('predictions.csv', index = False)
+# pred_df.sample(3)
