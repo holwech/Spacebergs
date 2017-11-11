@@ -23,12 +23,12 @@ def process_images(df):
     X_band2 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_2"]])
     X_band1_imfs1 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_1_imf_1"]])
     X_band1_imfs2 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_1_imf_2"]])
-    # X_band1_imfs3 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_1_imf_3"]])
-    # X_band1_imfs4 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_1_imf_4"]])
+    X_band1_imfs3 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_1_imf_3"]])
+    X_band1_imfs4 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_1_imf_4"]])
     X_band2_imfs1 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_2_imf_1"]])
     X_band2_imfs2 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_2_imf_2"]])
-    # X_band2_imfs3 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_2_imf_3"]])
-    # X_band2_imfs4 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_2_imf_4"]])
+    X_band2_imfs3 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_2_imf_3"]])
+    X_band2_imfs4 = np.array([np.array(band).astype(np.float32).reshape(75, 75) for band in df["band_2_imf_4"]])
     # Merge bands and add another band as the mean of Band 1 and Band 2 (useful for the ImageDataGenerator later)
     imgs = np.concatenate(([X_band1[:, :, :, np.newaxis],
                             X_band1_imfs1[:, :, :, np.newaxis],
@@ -106,7 +106,7 @@ from keras.layers import Input, Dense, Reshape, concatenate, Conv2D, Flatten, Ma
 from keras.layers import BatchNormalization, Dropout, GlobalMaxPooling2D
 
 def cnn_model():
-    pic_input = Input(shape=(75, 75, 7))
+    pic_input = Input(shape=(75, 75, 10))
     ang_input = Input(shape=(1,))
 
     cnn = BatchNormalization()(pic_input)
